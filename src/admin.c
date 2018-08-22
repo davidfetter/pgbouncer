@@ -1270,29 +1270,32 @@ static bool copy_arg(const char *src, regmatch_t *glist,
 
 static bool admin_show_help(PgSocket *admin, const char *arg)
 {
-	bool res;
-	SEND_generic(res, admin, 'N',
-		"sssss",
-		"SNOTICE", "C00000", "MConsole usage",
-		"D\n\tSHOW HELP|CONFIG|DATABASES"
-		"|POOLS|CLIENTS|SERVERS|VERSION\n"
-		"\tSHOW FDS|SOCKETS|ACTIVE_SOCKETS|LISTS|MEM\n"
-		"\tSHOW DNS_HOSTS|DNS_ZONES\n"
-		"\tSHOW STATS|STATS_TOTALS|STATS_AVERAGES\n"
-		"\tSET key = arg\n"
-		"\tRELOAD\n"
-		"\tPAUSE [<db>]\n"
-		"\tRESUME [<db>]\n"
-		"\tDISABLE <db>\n"
-		"\tENABLE <db>\n"
-		"\tRECONNECT [<db>]\n"
-		"\tKILL <db>\n"
-		"\tSUSPEND\n"
-		"\tSHUTDOWN\n",
-		"\tWAIT_CLOSE [<db>]", "");
-	if (res)
-		res = admin_ready(admin, "SHOW");
-	return res;
+	PktBuf *buf;
+
+	buf = pktbuf_dynamic(512);
+	if (!buf) {
+		admin_error(admin, "no mem");
+		return true;
+	}
+	pktbuf_write_RowDescription(buf, "ss", "HELP","");
+	pktbuf_write_DataRow(buf, "ss", "SHOW", "HELP|CONFIG|DATABASES|POOLS|CLIENTS|SERVERS|VERSION");
+	pktbuf_write_DataRow(buf, "ss", "SHOW", "FDS|SOCKETS|ACTIVE_SOCKETS|LISTS|MEM");
+	pktbuf_write_DataRow(buf, "ss", "SHOW", "DNS_HOSTS|DNS_ZONES");
+	pktbuf_write_DataRow(buf, "ss", "SHOW", "STATS|STATS_TOTALS|STATS_AVERAGES");
+	pktbuf_write_DataRow(buf, "ss", "SET",  "key = arg");
+	pktbuf_write_DataRow(buf, "ss", "RELOAD");
+	pktbuf_write_DataRow(buf, "ss", "PAUSE", "[<db>]");
+	pktbuf_write_DataRow(buf, "ss", "RESUME", "[<db>]");
+	pktbuf_write_DataRow(buf, "ss", "DISABLE", "<db>");
+	pktbuf_write_DataRow(buf, "ss", "ENABLE", "<db>");
+	pktbuf_write_DataRow(buf, "ss", "RECONNECT", "[<db>]");
+	pktbuf_write_DataRow(buf, "ss", "KILL", "<db>");
+	pktbuf_write_DataRow(buf, "ss", "SUSPEND", "");
+	pktbuf_write_DataRow(buf, "ss", "SHUTDOWN","");
+	pktbuf_write_DataRow(buf, "ss", "WAIT_CLOSE", "[<db>]");
+
+	admin_flush(admin, buf, "SHOW");
+	return true;
 }
 
 static bool admin_show_version(PgSocket *admin, const char *arg)
